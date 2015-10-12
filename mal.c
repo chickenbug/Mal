@@ -10,11 +10,13 @@ typedef struct mementry{
 # define BLOCKSIZE 1<<20;
 
 static char big_block[BLOCKSIZE];
-static int initialized = 0;
-static mementry *root;
 
-void* myfree(void* p1){
+
+void* mymalloc(unsigned int size){
+	static int initialized = 0;
+	static mementry *root;
 	mementry *p,*succ;
+	
 	if(!initialized){
 		root = (mementry*)big_block;
 		root->prev = root->succ = 0;
@@ -49,4 +51,32 @@ void* myfree(void* p1){
 			return ((char*) p + sizeof(mementry));
 		}
 	} /*should this be a do while because it's def not in the notes*/
+}
+
+void myfree(void * p1){
+	mementry *ptr, *pred, *succ;
+	ptr = (mementry*) p1 - 1;
+	if(((pred = ptr->prev) != 0) && (pred->isfree))
+	{
+		pred->size += sizeof(mementry) + ptr->size;
+		pred->succ = ptr -> succ;
+		if(ptr->succ != 0)
+		{
+			ptr->succ->prev = pred;
+		}
+	}
+	else{
+		ptr->isfree;
+		pred = ptr;
+	}
+	
+	if(((succ = ptr->succ) != 0) && (succ->isfree))
+	{
+		pred->size += sizeof(mementry) + succ->size;
+		pred->succ = succ->succ;
+		if(succ->succ != 0)
+		{
+			succ -> succ = pred;
+		}
+	}
 }
