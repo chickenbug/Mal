@@ -63,8 +63,27 @@ void* mymalloc(unsigned int size){
 
 /*our implementation of free*/
 void myfree(void * p1){
-	mementry *ptr, *pred, *succ;
+	int free_fail = 1 ;
+	mementry *ptr, *pred, *succ, *check;
 	ptr = (mementry*) p1 - 1;
+	check = (mementry*)big_block;
+
+	while(check->succ != 0 && free_fail != 0){
+		if(check == ptr){
+			if(ptr->isfree){
+				printf("ERROR: Redundant free at file: %s and line %d", __FILE__, __LINE__);
+				return;
+			} 
+			free_fail=0;
+		} 
+		check = check->succ; 
+	}
+
+	if(free_fail){
+		printf("ERROR: Unallocated pointer free at file: %s and line %d", __FILE__, __LINE__);
+		return;
+	} 
+
 	if(((pred = ptr->prev) != 0) && (pred->isfree))
 	{
 		pred->size += sizeof(mementry) + ptr->size;
