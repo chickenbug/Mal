@@ -14,51 +14,114 @@ static char big_block[BLOCKSIZE];
 
 /*our implementation of malloc*/
 void* mymalloc(unsigned int size){
-	static int initialized = 0;
-	static mementry *root;
-	mementry *p,*succ;
-	
-	/*if malloc has not yet been called*/
-	if(!initialized){
-		root = (mementry*)big_block;
-		root->prev = root->succ = 0;
-		root->size = BLOCKSIZE- sizeof(mementry);
-		root->isfree = 1;
-		initialized = 1;
-	}
-	
-	/*start the pointer at the root*/
-	p = root;
-	do{
-		/*iterate through*/
-		if(p->size < size)
-			p = p->succ;
-		else if(!p->isfree)
-			p = p->succ;
+	static int initialized_front = 0;
+	static int initialized_back = 0;
+	static mementry *root, *tail;
+	mementry *p,*succ, *small_check, *big_check;
+
+	if(size > 4096) { //Large block cutof at page size
+		//TODO ASHNI does big logic
+
+		/*if malloc has not yet been called*/
+		if(!initialized){
+			root = (mementry*)big_block;
+			root->prev = root->succ = 0;
+			root->size = BLOCKSIZE- sizeof(mementry);
+			root->isfree = 1;
+			initialized = 1;
+		}
 		
-		/* if the chunk is too small to split*/
-		else if(p->size < size + sizeof(mementry) + 8) /*fudge factor of 8*/
-		{
-			p->isfree = 0;
-			return (char*) p + sizeof(mementry) + size;
-		}
-		/*if the chunk is large enough to split*/
-		else{
-			succ = (mementry*)((char*)p + sizeof(mementry)+size);
-			succ -> prev = p;
-			succ -> succ = p -> succ;
-			if(p->succ != 0)
+		/*start the pointer at the root*/
+		p = root;
+		do{
+			/*iterate through*/
+			if(p->size < size)
+				p = p->succ;
+			else if(!p->isfree)
+				p = p->succ;
+			
+			/* if the chunk is too small to split*/
+			else if(p->size < size + sizeof(mementry) + 8) /*fudge factor of 8*/
 			{
-				p->succ->prev = succ;
+				p->isfree = 0;
+				return (char*) p + sizeof(mementry) + size;
 			}
-			p->succ = succ;
-			succ->size = p->size - sizeof(mementry) - size;
-			succ->isfree = 1;
-			p->size = size;
-			p->isfree = 0;
-			return ((char*) p + sizeof(mementry));
+			/*if the chunk is large enough to split*/
+			else{
+				succ = (mementry*)((char*)p + sizeof(mementry)+size);
+				succ -> prev = p;
+				succ -> succ = p -> succ;
+				if(p->succ != 0)
+				{
+					p->succ->prev = succ;
+				}
+				p->succ = succ;
+				succ->size = p->size - sizeof(mementry) - size;
+				succ->isfree = 1;
+				p->size = size;
+				p->isfree = 0;
+				return ((char*) p + sizeof(mementry));
+			}
+		} while(p != 0);
+		printf("ERROR: Memory saturation. Malloc failed at file: %s and line %d", __FILE__, __LINE__);
+		return;
+
+	}
+	else{ //TODO HAI-KINH does small logic
+		big_check = (mementry*)big_block[BLOCKSIZE-1];
+		if(initialized_back) 
+			big_check--;
+			while(big_check->succ){
+				big_check = big_check->succ;
+			}
 		}
-	} 
+
+		/*if malloc has not yet been called*/
+		if(!initialized){
+			root = (mementry*)big_block;
+			root->prev = root->succ = 0;
+			root->size = BLOCKSIZE- sizeof(mementry);
+			root->isfree = 1;
+			initialized = 1;
+		}
+		
+		/*start the pointer at the root*/
+		p = root;
+		do{
+			/*iterate through*/
+			if(p->size < size)
+				p = p->succ;
+			else if(!p->isfree)
+				p = p->succ;
+			
+			/* if the chunk is too small to split*/
+			/*NOTE do not forget to check size and update appropriately*/
+			else if(p->size < size + sizeof(mementry) + 8) /*fudge factor of 8*/
+			{
+				p->isfree = 0;
+				return (char*) p + sizeof(mementry) + size;
+			}
+			/*if the chunk is large enough to split*/
+			else{
+				succ = (mementry*)((char*)p + sizeof(mementry)+size);
+				succ -> prev = p;
+				succ -> succ = p -> succ;
+				if(p->succ != 0)
+				{
+					p->succ->prev = succ;
+				}
+				p->succ = succ;
+				succ->size = p->size - sizeof(mementry) - size;
+				succ->isfree = 1;
+				p->size = size;
+				p->isfree = 0;
+				return ((char*) p + sizeof(mementry));
+			}
+		} while(p != 0);
+		printf("ERROR: Memory saturation. Malloc failed at file: %s and line %d", __FILE__, __LINE__);
+		return;
+
+	}
 }
 
 /*our implementation of free*/
@@ -102,10 +165,7 @@ void myfree(void * p1){
 	{
 		pred->size += sizeof(mementry) + succ->size;
 		pred->succ = succ->succ;
-		if(succ->succ != 0)
-		{
-			succ -> succ = pred;
-		}
+		if(succ->succ != 0) succ->succ->prev = pred;
 	}
 	
 	return;
