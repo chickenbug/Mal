@@ -1,22 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/*standard memory entry in our program*/
 typedef struct mementry{
 	struct mementry *prev, *succ;
 	int isfree;
 	unsigned int size;
 } mementry;
 
-# define BLOCKSIZE 1<<20;
+#define BLOCKSIZE 1<<20;
 
 static char big_block[BLOCKSIZE];
 
-
+/*our implementation of malloc*/
 void* mymalloc(unsigned int size){
 	static int initialized = 0;
 	static mementry *root;
 	mementry *p,*succ;
 	
+	/*if malloc has not yet been called*/
 	if(!initialized){
 		root = (mementry*)big_block;
 		root->prev = root->succ = 0;
@@ -24,17 +26,23 @@ void* mymalloc(unsigned int size){
 		root->isfree = 1;
 		initialized = 1;
 	}
+	
+	/*start the pointer at the root*/
 	p = root;
 	do{
+		/*iterate through*/
 		if(p->size < size)
 			p = p->succ;
 		else if(!p->isfree)
 			p = p->succ;
-		else if(p->size < size + sizeof(mementry)) /*in BKR's notes he says he adds a fudge factor*/
+		
+		/* if the chunk is too small to split*/
+		else if(p->size < size + sizeof(mementry) + 8) /*fudge factor of 8*/
 		{
 			p->isfree = 0;
 			return (char*) p + sizeof(mementry) + size;
 		}
+		/*if the chunk is large enough to split*/
 		else{
 			succ = (mementry*)((char*)p + sizeof(mementry)+size);
 			succ -> prev = p;
@@ -50,9 +58,10 @@ void* mymalloc(unsigned int size){
 			p->isfree = 0;
 			return ((char*) p + sizeof(mementry));
 		}
-	} /*should this be a do while because it's def not in the notes*/
+	} 
 }
 
+/*our implementation of free*/
 void myfree(void * p1){
 	mementry *ptr, *pred, *succ;
 	ptr = (mementry*) p1 - 1;
@@ -79,4 +88,17 @@ void myfree(void * p1){
 			succ -> succ = pred;
 		}
 	}
+	
+	return;
+	
+	/*when the pointer is freed more than once*/
 }
+
+/*
+errors we need to handle:
+1) fragmentation
+2) saturation
+3) redundant freeing
+4) freeing pointers to dynamic memory that were never returned from malloc
+5) freeing pointers that were never allocated
+*/
