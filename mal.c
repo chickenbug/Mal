@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <mal.h>
 
 /*standard memory entry in our program*/
 typedef struct mementry{
